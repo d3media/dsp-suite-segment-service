@@ -74,27 +74,30 @@ Meta data fields start with underscore.
 
 ### Include/exclude users from a given segment
 
-You can include/exclude users from a given segment by sending a list of them to our service. That request will create an update job in our system. 
-This service accepts two files `include` and `exclude`. Both are a newline `\n` delimited lists of d3 media user IDs.  
+You can include/exclude users from a given segment by sending a `segment` update file. That request will create an update job in our system. 
 
-A sample file:
+A sample segment update file:
 
 ```
-user1
-user2
-user3
+user1:-1
+user2:120
+user3:0
 ```
+The format is: `d3 user id:lifetime` where the lifetime (specified in minutes) is:
+* 0 means that the user will be never removed from this segment
+* -1 means that the user will be removed from this segment.
+* Time to live (TTL) expressed in seconds, ie: 30 means 30 seconds
 
-You can call this services with both files or just one. Here is curl example.
+Here is curl example.
 
 ```
 advertiser_id=a0
 segment_id=a0g0
 curl -v -H "$auth" \
--F "include=@file1" \
--F "exclude=@file2" \ 
+-F "segment=@segment" \
 "https://dsp-suite.ligamatic.com/advertisers/${advertiser_id}/segments/${segment_id}"
 ```
+*IMPORTANT* the file name must be `segment`, the delimiter must be colons `:`.
 
 If everything went fine you will receive a status 201 and a *status link header*
 
