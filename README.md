@@ -15,6 +15,7 @@ Please use always the `https` protocol.
 1. [Authentication](#authentication)
 2. [Query segments for a given advertiser](#query-segments-for-a-given-advertiser)
 3. [Include/Exclude users from a given segment](#includeexclude-users-from-a-given-segment)
+4. [Implementations](#implementations)
 
 ### Authentication
 
@@ -59,6 +60,7 @@ In order to create a new segment you need to post it to `/advertisers/:advertise
 ```
 curl -v -H 'content-type: application/json' -H "$auth" -X POST "https://dsp-suite.ligamatic.com/advertisers/a0/segments"  -d '{"name": "my segment"}' 
 ```
+
 
 You can also attach meta data to segments. Your meta data is only visible to you. Other parties will not have acces to it.
 Meta data fields start with underscore.
@@ -138,7 +140,9 @@ This parameter is an url (encoded please). We will post the result of the job to
 advertiser_id=a0
 segment_id=a0g0
 curl -v -H "$auth" \
--F "include=@file1" \
--F "exclude=@file2" \
+-F "segment=@segment" \
 "https://dsp-suite.ligamatic.com/advertisers/${advertiser_id}/segments/${segment_id}?callback=https://service.io/jobdone?id=\{job_id\}"
 ```
+
+## Implementations
+* [node.js](https://github.com/d3media/ligamatic-api-node)
