@@ -3,52 +3,61 @@
 *Segment service* allows third parties to add/remove users from segments.
 Those segments should be created in advance by its advertisers.
 
-*IMPORTANT* Before you can use this service you need to send an enquire to [support@ligamatic.com](mailto://support@ligamatic.com).
+*IMPORTANT* This is not a public API.  In order to get access you must have an account.  Please contact [support@ligamatic.com](mailto://support@ligamatic.com).
 
 ## API
 
-Our api is a simple to use REST JSON one. The examples of this manual use [curl](http://curl.haxx.se/) and a little bit of shell scripting. If you have any trouble or question please open an issue.  
-The service address is `https://dsp-suite.ligamatic.com`.  
-Calls to its equivalent non secure (http) countertpart will just not work.  
-Please use always the `https` protocol.
+This API is REST/JSON.  The following examples use [curl](http://curl.haxx.se/) and a little bit of shell scripting. If you have any issues, feel free to contact support at the email above.
 
-1. [Authentication](#authentication)
-2. [Query segments for a given advertiser](#query-segments-for-a-given-advertiser)
-3. [Include/Exclude users from a given segment](#includeexclude-users-from-a-given-segment)
-4. [Implementations](#implementations)
+1. [Service Address](#service-address)
+2. [Authentication](#authentication)
+3. [Query segments for a given advertiser](#query-segments-for-a-given-advertiser)
+4. [Include/Exclude users from a given segment](#includeexclude-users-from-a-given-segment)
+5. [Checking Update Status](#checking-update-status)
+6. [Implementations](#implementations)
+
+### Service Address
+
+The API service can be accessed at `https://dsp-suite.ligamatic.com`.  
+Calls to the non-secure (http) url will not work.
 
 ### Authentication
 
-To authenticate your requests to our system you need to add an authentication header to them.
-The header has the following morphology:
+All requests must be authenticated.
+Requests are authenticated via an authentication header that you provide on each request.
+The header has the following form:
 ```
-authentication: Token $user_id;$timespan;sha1Hash($timespan$password)
+authentication: Token $user_id;$timestamp;sha1Hash($timestamp$password)
 ```
 Where  
 1. `$user_id` is your user id  
-2. `$timespan` [unix timespan](https://en.wikipedia.org/wiki/Unix_time)  
+2. `$timestamp` [unix timestamp](https://en.wikipedia.org/wiki/Unix_time)  
 3. `$password` is the password we have already provided to you.  
 
-*Important* If there is a difference of +300 seconds between your submited unix timespan and our unix timespan we will return a `403` with a `bad timespan` message.
-All our responses include our `timespan` in the the `timespan` header. You can store the difference in a variable and add it to your `timespan` in every request.
+*Important* If there is a difference of +/- 300 seconds between your submitted unix timestamp and our unix timestamp we will return a `403` with a `bad timestamp` message.  This is to prevent replay attacks on your account.
+All of our responses include our `timestamp` in the the `timestamp` header. You can store the difference from your server clock and add/subtract it to your `timestamp` in every request.  If you are keeping your server clocks updated with ntpd this shouldn't be an issue.
 
 A shell example
 ```
-user_id=user
-timespan='1433331278'
+user_id='user'
+timestamp='1433331278'
 password='secret'
 
-auth="authentication: Token $user_id;$timespan;`echo -n "$timespan" | openssl sha1 -binary |base64`"
-# $auth value is 'authentication: Token user;1433331307;bGiDvpb0NW7ZFtuUcgU9LILvNR8='
+# build the authentication header
+auth="authentication: Token $user_id;$timestamp;`echo -n "$timestamp" | openssl sha1 -binary | base64`"
+# example: $auth value is 'authentication: Token user;1433331307;bGiDvpb0NW7ZFtuUcgU9LILvNR8='
 
-# 
 # Use the authentication header with curl
 curl -H "$auth" "https://dsp-suite.ligamatic.com..."
 ```
 
 ### Query segments for a given advertiser
 
+In your DSP account you likely have multiple advertisers.  
+The following method returns a list of DSP segments for a given advertiser.
+
 ```
+# a0 is an advertiser id under your account
 curl -H "$auth" "https://dsp-suite.ligamatic.com/advertisers/a0/segments"
 ```
 
@@ -57,12 +66,14 @@ curl -H "$auth" "https://dsp-suite.ligamatic.com/advertisers/a0/segments"
 In order to create a new segment you need to post it to `/advertisers/:advertiser_id/segments`.  
 `name` is mandatory. Use alphanumeric characters plus `-_` and spaces.
 
+This will create a new segment in your DSP account under the specified advertiser and store the mapping in the DSP-Suite system.
+
 ```
 curl -v -H 'content-type: application/json' -H "$auth" -X POST "https://dsp-suite.ligamatic.com/advertisers/a0/segments"  -d '{"name": "my segment"}' 
 ```
 
 
-You can also attach meta data to segments. Your meta data is only visible to you. Other parties will not have acces to it.
+You can also attach meta-data to segments.  Meta-data is useful for simplifying your technical integration with us as you can leave data for your application associated with the segments in our system.
 Meta data fields start with underscore.
 ```
 // example JSON segment with meta data
@@ -72,11 +83,11 @@ Meta data fields start with underscore.
 }
 ```
 
-*You can submit up to 128 bytes of data.*
+*You can add up to 128 bytes of data per segment.*
 
 ### Include/exclude users from a given segment
 
-You can include/exclude users from a given segment by sending a `segment` update file. That request will create an update job in our system. 
+You can include/exclude users from a given segment by sending a `segment` update file. That request will create an update job in our system which will be processed in near real-time.  We will use your update file and our internal mapping in order to update the users of the specified segment in your connected DSP.
 
 A sample segment update file:
 
@@ -90,7 +101,9 @@ The format is: `d3 user id:lifetime` where the lifetime (specified in minutes) i
 * -1 means that the user will be removed from this segment.
 * Time to live (TTL) expressed in seconds, ie: 30 means 30 seconds
 
-Here is curl example.
+*If you want to specify segments in terms of hashed emails (etc) or your own cookie IDs instead of d3 cookie IDs, let us know.  We also support this.*
+
+Here is a curl example.
 
 ```
 advertiser_id=a0
@@ -99,9 +112,9 @@ curl -v -H "$auth" \
 -F "segment=@segment" \
 "https://dsp-suite.ligamatic.com/advertisers/${advertiser_id}/segments/${segment_id}"
 ```
-*IMPORTANT* the file name must be `segment`, the delimiter must be colons `:`.
+*IMPORTANT* in the above example, the segment file name must be `segment`, the delimiter within the segment file must be a colon (`:`).
 
-If everything went fine you will receive a status 201 and a *status link header*
+If everything worked you will receive a status 201 and a *Link* header containing a url to check the status of the update.
 
 ```
 
@@ -130,12 +143,22 @@ If everything went fine you will receive a status 201 and a *status link header*
 
 ```
 
-The *status link header* points to a url you can query to check the state of the job. Jobs can take a certain of time to finish so please do not query the status every 100ms.  
-Instead of polling us, you can specify a url to we can call you back when the job is done. To do that, you need to inclued in the querystring the `callback` parameter.
-This parameter is an url (encoded please). We will post the result of the job to that url. In order to simplify your integration with us you can add `{job_id}` to any part of your url. We will replace it with the job id.
+### Checking Update Status
+
+The segment in your connected DSP may take a while to update depending on the size of your segment and the speed of the DSP API.  It happens in real-time from our system but the update doesn't complete instantly.
+
+The *status link header* contains a url you can query to check the state of the update. 
+Please limit your update checks to once every 10 seconds or so as DSP APIs take a while to update with large segment lists.
+
+Instead of polling/waiting, you can specify a url ("webhook") that we will call when the job is done. 
+You can specify your call-back/webhook URL as a querystring variable with name `callback`.
+Please URL encode your URL before inserting into querystring to avoid problems.
+We will POST the results of the segment update to your URL. 
+Your call-back URL can optionally include the string `{job_id}` and we will replace this with the job id prior to callback.
+
 
 ```
-# PLEASO NOTE {job_id} has been escaped to \{job_id\} so bash does not expand it.
+# PLEASE NOTE {job_id} has been escaped to \{job_id\} so bash does not expand it.
 # In a regular integration you should encode the whole callback parameter value
 advertiser_id=a0
 segment_id=a0g0
@@ -144,5 +167,5 @@ curl -v -H "$auth" \
 "https://dsp-suite.ligamatic.com/advertisers/${advertiser_id}/segments/${segment_id}?callback=https://service.io/jobdone?id=\{job_id\}"
 ```
 
-## Implementations
+### Implementations
 * [node.js](https://github.com/d3media/ligamatic-api-node)
